@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Find Local Store</title>
+  <meta name="description" content="Type an item and find local stores near you. Mobile friendly." />
+  <style>
+    :root{
+      --bg:#f7f7fb;
+      --card:#ffffff;
+      --accent:#0b69ff;
+      --muted:#666;
+      --radius:14px;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    }
+    html,body{height:100%;}
+    body{
+      margin:0;
+      background:linear-gradient(180deg,var(--bg),#eef2ff 100%);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:24px;
+    }
+    .wrap{
+      width:100%;
+      max-width:720px;
+      background:var(--card);
+      border-radius:var(--radius);
+      box-shadow:0 8px 30px rgba(20,30,60,0.08);
+      padding:20px;
+    }
+    header{
+      display:flex;
+      gap:12px;
+      align-items:center;
+      margin-bottom:12px;
+    }
+    .logo{
+      width:56px;height:56px;border-radius:12px;
+      background:linear-gradient(135deg,var(--accent),#2bd3ff);
+      display:flex;align-items:center;justify-content:center;color:white;font-weight:700;
+      font-size:20px;
+    }
+    h1{font-size:18px;margin:0;}
+    p.lead{margin:6px 0 16px;color:var(--muted);font-size:14px;}
+    form{display:flex;gap:8px;align-items:center;}
+    input[type="search"]{
+      flex:1;padding:14px 12px;border-radius:12px;border:1px solid #e6e9f0;
+      font-size:16px;outline:none;
+      box-shadow:inset 0 1px 0 rgba(255,255,255,0.6);
+    }
+    button{
+      background:var(--accent);color:white;border:none;padding:12px 14px;border-radius:12px;
+      font-size:15px;min-width:120px;
+    }
+    .small{font-size:13px;color:var(--muted);margin-top:12px;}
+    .example{color:#0b69ff;text-decoration:underline;cursor:pointer}
+    .spinner{display:inline-block;width:18px;height:18px;border-radius:50%;border:3px solid rgba(255,255,255,0.35);border-top-color:rgba(255,255,255,0.95);animation:spin .9s linear infinite;vertical-align:middle;margin-left:8px}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    @media (prefers-color-scheme:dark){
+      :root{--bg:#0b1020;--card:#0f1724;--accent:#4aa3ff;--muted:#9aa6bd}
+      body{background:linear-gradient(180deg,#061022,#081826)}
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap" role="main">
+    <header>
+      <div class="logo" aria-hidden="true">S</div>
+      <div>
+        <h1>Find a Local Store</h1>
+        <p class="lead">Type what you want to buy and we'll open local results in Maps.</p>
+      </div>
+    </header>
+
+    <form id="findForm" aria-label="Find local store">
+      <input id="query" type="search" placeholder='e.g. "running shoes", "batteries", "printer toner"' aria-label="Item to search for" required />
+      <button type="submit" id="goBtn">Find stores</button>
+    </form>
+
+    <p class="small">
+      Tip: tap one of these examples:
+      <span class="example" data-q="running shoes">running shoes</span>,
+      <span class="example" data-q="batteries">batteries</span>,
+      <span class="example" data-q="pet food">pet food</span>.
+    </p>
+
+    <p class="small" id="status" aria-live="polite" style="display:none"></p>
+  </main>
+
+  <script>
+    (function(){
+      const form = document.getElementById('findForm');
+      const qInput = document.getElementById('query');
+      const statusP = document.getElementById('status');
+      const goBtn = document.getElementById('goBtn');
+
+      // helper: detect iOS
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+
+      function setStatus(msg, busy=false){
+        statusP.style.display = msg ? 'block' : 'none';
+        statusP.textContent = msg || '';
+        if(busy){
+          if(!document.getElementById('s')) {
+            const s = document.createElement('span'); s.id='s'; s.className='spinner'; statusP.appendChild(s);
+          }
+        } else {
+          const s = document.getElementById('s'); if(s) s.remove();
+        }
+      }
+
+      function openMapsWithLocation(query, lat, lng){
+        // Use Apple Maps on iOS for better UX, else Google Maps
+        const encoded = encodeURIComponent(query);
+        if(isIOS){
+          // Apple Maps URL
+          const url = `https://maps.apple.com/?q=${encoded}&sll=${lat},${lng}&z=14`;
+          window.location.href = url;
+        } else {
+          // Google Maps web URL (opens app when installed)
+          const url = `https://www.google.com/maps/search/?api=1&query=${encoded}&center=${lat},${lng}`;
+          window.location.href = url;
+        }
+      }
+
+      function openMapsFallback(query){
+        const encoded = encodeURIComponent(query + ' near me');
+        if(isIOS){
+          window.location.href = `https://maps.apple.com/?q=${encoded}`;
+        } else {
+          window.location.href = `https://www.google.com/maps/search/?api=1&query=${encoded}`;
+        }
+      }
+
+      // handle form submit
+      form.addEventListener('submit', function(evt){
+        evt.preventDefault();
+        const query = qInput.value.trim();
+        if(!query) return;
+        setStatus('Locating you for better local results…', true);
+        goBtn.disabled = true;
+
+        // Try fast geolocation (short timeout), but fallback to "near me"
+        if(navigator.geolocation){
+          const geoOpts = { enableHighAccuracy: false, timeout: 4500, maximumAge: 60000 };
+          let settled = false;
+
+          navigator.geolocation.getCurrentPosition(function(pos){
+            if(settled) return;
+            settled = true;
+            setStatus('');
+            openMapsWithLocation(query, pos.coords.latitude, pos.coords.longitude);
+          }, function(err){
+            // failed or denied
+            if(settled) return;
+            settled = true;
+            setStatus('Could not get precise location — opening general search.', false);
+            // small delay so user sees message, then open fallback
+            setTimeout(()=> openMapsFallback(query), 650);
+          }, geoOpts);
+
+          // safety fallback in case browser doesn't call callbacks (older browsers)
+          setTimeout(()=>{
+            if(settled) return;
+            settled = true;
+            setStatus('Opening search…', false);
+            openMapsFallback(query);
+          }, 6000);
+
+        } else {
+          setStatus('');
+          openMapsFallback(query);
+        }
+      });
+
+      // example quick-fill
+      document.querySelectorAll('.example').forEach(el=>{
+        el.addEventListener('click', ()=> {
+          qInput.value = el.dataset.q;
+          qInput.focus();
+        });
+      });
+
+      // small UX: select all on focus
+      qInput.addEventListener('focus', ()=> qInput.select());
+    })();
+  </script>
+</body>
+</html>
