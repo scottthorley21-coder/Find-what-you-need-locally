@@ -4,202 +4,172 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Haverfordwest Local Store Finder</title>
-  <meta name="description" content="Type what you want to buy — we show you local stores in Haverfordwest area." />
+  <meta name="description" content="Find local shops near Haverfordwest based on what you want to buy." />
+
   <style>
     :root {
-      --bg: #f4f6fd;
+      --bg: #f4f7fe;
       --card: #ffffff;
-      --accent: #0055a5; /* Haverfordwest-style blue */
-      --muted: #555;
-      --radius: 12px;
-      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      --accent: #0055a5;
+      --muted: #666;
+      --radius: 14px;
+      font-family: system-ui, sans-serif;
     }
-    html, body { height: 100%; margin: 0; }
     body {
+      margin: 0;
+      background: var(--bg);
       display: flex;
       align-items: center;
       justify-content: center;
-      background: var(--bg);
-      padding: 20px;
-    }
-    .container {
-      width: 100%;
-      max-width: 600px;
-      background: var(--card);
-      border-radius: var(--radius);
-      box-shadow: 0 4px 20px rgba(0,0,50,0.08);
       padding: 24px;
+    }
+    .wrap {
+      width: 100%;
+      max-width: 650px;
+      background: var(--card);
+      padding: 24px;
+      border-radius: var(--radius);
+      box-shadow: 0 8px 25px rgba(0,0,0,0.07);
       text-align: center;
     }
-    img.logo {
-      max-width: 120px;
-      height: auto;
+
+    /* Simple built-in SVG logo — no external files */
+    .logo {
+      width: 140px;
       margin-bottom: 16px;
     }
+
     h1 {
-      margin: 0 0 8px 0;
-      color: var(--accent);
+      margin: 0 0 10px;
       font-size: 24px;
+      color: var(--accent);
     }
     p.lead {
-      margin: 0 0 20px 0;
-      color: var(--muted);
+      margin: 0 0 20px;
       font-size: 16px;
+      color: var(--muted);
     }
     form {
       display: flex;
-      gap: 8px;
+      gap: 10px;
       flex-wrap: wrap;
     }
-    input[type="search"] {
+    input {
       flex: 1 1 auto;
-      padding: 12px;
-      border: 1px solid #ccc;
-      border-radius: var(--radius);
+      padding: 14px;
       font-size: 16px;
-      min-width: 160px;
+      border-radius: var(--radius);
+      border: 1px solid #ccc;
     }
     button {
       background: var(--accent);
       color: white;
       border: none;
-      border-radius: var(--radius);
-      padding: 12px 18px;
+      padding: 14px 18px;
       font-size: 16px;
+      border-radius: var(--radius);
       cursor: pointer;
     }
-    button:disabled { opacity: 0.6; }
-    .status {
-      margin-top: 16px;
+    button:disabled {
+      opacity: 0.6;
+    }
+    #status {
+      margin-top: 18px;
       font-size: 14px;
       color: var(--muted);
-    }
-    .spinner {
-      display: inline-block;
-      width: 18px; height: 18px;
-      border: 3px solid rgba(255,255,255,0.4);
-      border-top-color: white;
-      border-radius: 50%;
-      animation: spin .9s linear infinite;
-      vertical-align: middle;
-      margin-left: 8px;
-    }
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --bg: #0a0c14;
-        --card: #11161f;
-        --accent: #1e6de5;
-        --muted: #9aa6bd;
-      }
-      body { background: var(--bg); }
-      .container { box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
+      display: none;
     }
   </style>
 </head>
+
 <body>
-  <div class="container">
-    <!-- Haverfordwest logo — update URL if you host locally or choose another version -->
-    <img class="logo" src="https://logoneate.com/haverfordwest-county/logo.png" alt="Haverfordwest logo" />
-    <h1>Find a Local Store</h1>
-    <p class="lead">Type what you want to buy — we’ll show nearby stores around Haverfordwest.</p>
+<div class="wrap">
 
-    <form id="searchForm">
-      <input id="query" type="search" placeholder='e.g. "batteries", "pet food", "printer toner"' required />
-      <button type="submit" id="go">Search</button>
-    </form>
+  <!-- Self-contained SVG logo -->
+  <svg class="logo" viewBox="0 0 300 90">
+    <rect width="300" height="90" rx="12" fill="#0055a5"/>
+    <text x="20" y="55" font-size="34" fill="white" font-family="sans-serif" font-weight="700">
+      Haverfordwest
+    </text>
+  </svg>
 
-    <div class="status" id="status" aria-live="polite" style="display:none;"></div>
-  </div>
+  <h1>Find a Local Store</h1>
+  <p class="lead">Type what you want to buy — we’ll show nearby shops around Haverfordwest.</p>
 
-  <script>
-    (function(){
-      const form = document.getElementById('searchForm');
-      const q = document.getElementById('query');
-      const status = document.getElementById('status');
-      const btn = document.getElementById('go');
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  <form id="form">
+    <input id="query" type="search" placeholder="e.g. batteries, pet food, shoes" required>
+    <button id="go" type="submit">Search</button>
+  </form>
 
-      function showStatus(msg, busy=false) {
-        status.style.display = msg ? 'block' : 'none';
-        status.textContent = msg;
-        if (busy) {
-          if (!document.getElementById('sp')) {
-            const s = document.createElement('span');
-            s.id = 'sp';
-            s.className = 'spinner';
-            status.appendChild(s);
-          }
-        } else {
-          const sp = document.getElementById('sp');
-          if (sp) sp.remove();
-        }
-      }
+  <div id="status"></div>
+</div>
 
-      function openMaps(query, lat, lng) {
-        const enc = encodeURIComponent(query);
-        if (isIOS) {
-          window.location.href = \`https://maps.apple.com/?q=\${enc}&sll=\${lat},\${lng}&z=14\`;
-        } else {
-          window.location.href = \`https://www.google.com/maps/search/?api=1&query=\${enc}&center=\${lat},\${lng}\`;
-        }
-      }
+<script>
+  const form = document.getElementById("form");
+  const query = document.getElementById("query");
+  const statusBox = document.getElementById("status");
+  const btn = document.getElementById("go");
 
-      function fallbackMaps(query) {
-        const enc = encodeURIComponent(query + ' near Haverfordwest');
-        if (isIOS) {
-          window.location.href = \`https://maps.apple.com/?q=\${enc}\`;
-        } else {
-          window.location.href = \`https://www.google.com/maps/search/?api=1&query=\${enc}\`;
-        }
-      }
+  function msg(text) {
+    statusBox.style.display = "block";
+    statusBox.textContent = text;
+  }
 
-      form.addEventListener('submit', e => {
-        e.preventDefault();
-        const val = q.value.trim();
-        if (!val) return;
-        showStatus('Getting location…', true);
-        btn.disabled = true;
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
 
-        if (navigator.geolocation) {
-          const opts = { enableHighAccuracy: false, timeout: 5000, maximumAge: 60000 };
-          let done = false;
+  function openMaps(q, lat, lng) {
+    const encoded = encodeURIComponent(q);
+    if (isIOS) {
+      window.location.href = `https://maps.apple.com/?q=${encoded}&sll=${lat},${lng}&z=14`;
+    } else {
+      window.location.href = `https://www.google.com/maps/search/?api=1&query=${encoded}&center=${lat},${lng}`;
+    }
+  }
 
-          navigator.geolocation.getCurrentPosition(pos => {
-            if (done) return;
-            done = true;
-            showStatus('', false);
-            openMaps(val, pos.coords.latitude, pos.coords.longitude);
-          }, err => {
-            if (done) return;
-            done = true;
-            showStatus('Could not get precise location — opening general search.', false);
-            setTimeout(() => fallbackMaps(val), 800);
-          }, opts);
+  function fallback(q) {
+    const encoded = encodeURIComponent(q + " near Haverfordwest");
+    if (isIOS) {
+      window.location.href = `https://maps.apple.com/?q=${encoded}`;
+    } else {
+      window.location.href = `https://www.google.com/maps/search/?api=1&query=${encoded}`;
+    }
+  }
 
-          setTimeout(() => {
-            if (done) return;
-            done = true;
-            showStatus('Opening search…', false);
-            fallbackMaps(val);
-          }, 6500);
-        } else {
-          fallbackMaps(val);
-        }
-      });
+  form.addEventListener("submit", function(e) {
+    e.preventDefault();
+    const q = query.value.trim();
+    btn.disabled = true;
+    msg("Getting your location…");
 
-    })();
-  </script>
+    if (!navigator.geolocation) {
+      fallback(q);
+      return;
+    }
 
-  <!-- Google Analytics snippet placeholder — replace 'G-XXXXXXXXXX' with your ID -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
-  <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){ dataLayer.push(arguments); }
-    gtag('js', new Date());
-    gtag('config', 'G-XXXXXXXXXX');
-  </script>
+    let done = false;
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        if (done) return;
+        done = true;
+        openMaps(q, pos.coords.latitude, pos.coords.longitude);
+      },
+      err => {
+        if (done) return;
+        done = true;
+        msg("Opening general search…");
+        setTimeout(() => fallback(q), 600);
+      },
+      { timeout: 5000 }
+    );
+
+    setTimeout(() => {
+      if (done) return;
+      done = true;
+      msg("Opening search…");
+      fallback(q);
+    }, 6000);
+  });
+</script>
+
 </body>
 </html>
